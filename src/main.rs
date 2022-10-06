@@ -23,9 +23,6 @@ fn main() {
      * it is yet to be decided whether
      */
 
-    execute_script("  /home/ishan/background/test.sh");
-    println!("contents of script are {}", fs::read_to_string("/home/ishan/background/test.sh").expect("nooooooo!"));
-
     let args = env::args().collect::<Vec<_>>();
     if args.len() > 1 {
         match &args[1] as &str {
@@ -42,6 +39,8 @@ fn main() {
             // minute
             let my_map: HashMap<[u32; 5], String> = deserialize();
 
+            println!("My map = {my_map:?}");
+
             let time: chrono::DateTime<chrono::Local> = chrono::offset::Local::now();
 
             let daily_time = time.time().to_string();
@@ -52,33 +51,35 @@ fn main() {
             let script_path = my_map.get(&time_day);
             match script_path {
                 Some(path) => execute_script(path),
-                None => continue,
+                None => {},
             }
-            thread::sleep(time::Duration::from_millis(59 * 1000));
+            thread::sleep(time::Duration::from_millis(30 * 1000));
         }
     }
 }
 
 fn execute_script(path: &str) {
-    path.trim();
-    println!("{path}");
-    println!(
-        "{:?}",
-        std::process::Command::new("bash")
-            .arg(path)
+    let trimmed_path = path.trim();
+    let output = std::process::Command::new("bash")
+            .arg(trimmed_path)
             .output()
-            .expect("Couldn't execute command")
+            .expect("Couldn't execute command");
+    println!(
+        "stdout was \n {:?} \n stderr was \n {:?} ", String::from_utf8(output.stdout), String::from_utf8(output.stderr)
     );
 }
 
 fn add(args: Vec<String>) {
     // deserialize the hasmap, add the entry to the hashmap, then reserialize it
     let mut my_map: HashMap<[u32; 5], String> = deserialize();
+    println!("Original map is {my_map:?}");
     my_map.insert(
         convert_date(&args[2] as &str, &args[3] as &str),
         args[4].clone(),
     );
+    println!("New map is {my_map:?}");
     serialize(my_map);
+    println!("content of the file is {}", fs::read_to_string(SERIALIZE).expect("Sadness"));
     // serialized_map = serde_json::to_string(&my_map).expect("Could not serialize");
     // let mut serialize_file = File::options()
     //     .write(true)
@@ -125,9 +126,11 @@ fn convert_date(date: &str, time: &str) -> [u32; 5] {
 fn list() {
     // Read the hashmap from the file and then print it out, maybe want a custom print
     let my_map: HashMap<[u32; 5], String> = deserialize();
+    println!("Contents of my map is {my_map:?}");
     for (time, script) in my_map {
-        println!("Will execute {script} at {}", revert_date(time));
+        println!("Will execute {} at {}", script.trim(), revert_date(time));
     }
+    // doesn't list entire map for some reason: MAJOR ERROR
 }
 
 fn revert_date(date: [u32; 5]) -> String {
@@ -214,6 +217,7 @@ fn deserialize() -> HashMap<[u32; 5], String> {
     if let Ok(lines) = read_lines(SERIALIZE) {
         let mut array = String::new();
         for line in lines {
+            println!("line is {line:?}");
             let mut path_to_script = String::new();
             if let Ok(line_result) = line {
                 let mut found = false;
@@ -231,7 +235,6 @@ fn deserialize() -> HashMap<[u32; 5], String> {
                 // key = "[u32, u32, u32, u32, u32]"
                 // value = "path/to/file"
             }
-            path_to_script.trim();
             map.insert(get_array(&array[1..array.len() - 1]), path_to_script);
         }
     }
